@@ -1,0 +1,6 @@
+{
+  "name": "milkguard-whatsapp-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Free Vercel proxy for MilkGuard WhatsApp alerts (no Firebase Blaze required)"
+}

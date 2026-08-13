@@ -20,7 +20,11 @@ export default function useDeviceStatus() {
 
   useEffect(() => {
     const unsubscribe = subscribeDeviceStatus((incoming) => {
-      const seen = incoming?.lastSeen ?? null;
+      let seen = incoming?.lastSeen ?? null;
+      // ESP32 sends epoch seconds; normalize to milliseconds for comparison
+      if (seen && seen < 1e12) {
+        seen = seen * 1000;
+      }
       lastSeenRef.current = seen;
       setData(incoming);
       setLastSeen(seen);
@@ -28,7 +32,10 @@ export default function useDeviceStatus() {
     });
 
     const interval = setInterval(() => {
-      const seen = lastSeenRef.current;
+      let seen = lastSeenRef.current;
+      if (seen && seen < 1e12) {
+        seen = seen * 1000;
+      }
       setOnline(seen ? Date.now() - seen < ONLINE_THRESHOLD_MS : false);
     }, POLL_INTERVAL_MS);
 

@@ -3,8 +3,9 @@ import { FiSave } from "react-icons/fi";
 
 import Loading from "../../components/common/Loading";
 import { getSettings, updateSettings } from "../../services/settingsService";
+import { isWhatsAppConfigured } from "../../services/whatsappService";
 
-const FIELDS = [
+const THRESHOLD_FIELDS = [
   { key: "freshPHMin", label: "Fresh pH — Min", step: "0.1" },
   { key: "freshPHMax", label: "Fresh pH — Max", step: "0.1" },
   { key: "warningGas", label: "Warning Gas (ppm)", step: "1" },
@@ -26,8 +27,16 @@ export default function Settings() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleChange = (key, value) => {
+  const handleNumberChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: parseFloat(value) }));
+  };
+
+  const handleTextChange = (key, value) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleToggle = (key) => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleSave = async (e) => {
@@ -57,20 +66,71 @@ export default function Settings() {
         {loading || !settings ? (
           <Loading label="Loading settings..." />
         ) : (
-          <form onSubmit={handleSave} className="space-y-5">
+          <form onSubmit={handleSave} className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {FIELDS.map((field) => (
+              {THRESHOLD_FIELDS.map((field) => (
                 <div key={field.key}>
                   <label className="block text-sm font-medium mb-1">{field.label}</label>
                   <input
                     type="number"
                     step={field.step}
                     value={settings[field.key]}
-                    onChange={(e) => handleChange(field.key, e.target.value)}
+                    onChange={(e) => handleNumberChange(field.key, e.target.value)}
                     className="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               ))}
+            </div>
+
+            <div className="border-t pt-6 space-y-4">
+              <h2 className="font-semibold text-gray-700">WhatsApp Notifications</h2>
+
+              <div
+                className={`rounded-lg px-4 py-3 text-sm ${
+                  isWhatsAppConfigured()
+                    ? "bg-green-50 text-green-800 border border-green-200"
+                    : "bg-amber-50 text-amber-900 border border-amber-200"
+                }`}
+              >
+                {isWhatsAppConfigured() ? (
+                  <span>WhatsApp proxy connected.</span>
+                ) : (
+                  <span>
+                    Set <code className="text-xs">VITE_WHATSAPP_PROXY_URL</code> and{" "}
+                    <code className="text-xs">VITE_WHATSAPP_PROXY_SECRET</code> in{" "}
+                    <code className="text-xs">.env</code>.
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Owner WhatsApp Phone</label>
+                <input
+                  type="text"
+                  value={settings.ownerPhone || ""}
+                  onChange={(e) => handleTextChange("ownerPhone", e.target.value)}
+                  className="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="+94771234567"
+                />
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { key: "notifyOwnerWarning", label: "Owner WhatsApp on Warning" },
+                  { key: "notifyOwnerSpoiled", label: "Owner WhatsApp on Spoiled milk" },
+                  { key: "notifyOwnerDevice", label: "Owner WhatsApp when device goes offline" },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!settings[key]}
+                      onChange={() => handleToggle(key)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm">{label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center gap-4">

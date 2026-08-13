@@ -12,6 +12,10 @@ export const DEFAULT_THRESHOLDS = {
   spoiledGas: 800,
   warningTemp: 30,
   spoiledTemp: 35,
+  ownerPhone: "",
+  notifyOwnerWarning: true,
+  notifyOwnerSpoiled: true,
+  notifyOwnerDevice: true,
 };
 
 /**

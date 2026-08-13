@@ -8,12 +8,22 @@ import {
   ArcElement,
   Tooltip,
   Legend,
+  Filler,
 } from "chart.js";
 import { Line, Doughnut } from "react-chartjs-2";
 
 import { toDateString } from "../../services/milkCollectionService";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 // `records` is the array of milkCollections documents (see milkCollectionService.getAllCollections)
 export default function DashboardCharts({ records = [] }) {

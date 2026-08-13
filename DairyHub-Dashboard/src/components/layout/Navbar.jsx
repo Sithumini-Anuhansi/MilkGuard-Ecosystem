@@ -5,7 +5,12 @@ import useNotifications from "../../hooks/useNotifications";
 import { useAuth } from "../../context/AuthContext";
 
 export default function Navbar({ role, onMenuClick }) {
-  const { unreadCount } = useNotifications();
+  const { collectorId } = useAuth();
+  const notificationRole = role === "owner" ? "OWNER" : "COLLECTOR";
+  const { unreadCount } = useNotifications({
+    role: notificationRole,
+    collectorId: role === "collector" ? collectorId : null,
+  });
   const navigate = useNavigate();
   const { user, profile } = useAuth();
 
@@ -17,7 +22,6 @@ export default function Navbar({ role, onMenuClick }) {
 
   return (
     <header className="h-16 bg-white/80 backdrop-blur shadow-sm border-b flex items-center justify-between px-4 sm:px-6 shrink-0">
-      {/* Left */}
       <button
         onClick={onMenuClick}
         className="lg:hidden text-2xl text-gray-600 hover:text-gray-900"
@@ -28,9 +32,7 @@ export default function Navbar({ role, onMenuClick }) {
 
       <div className="hidden lg:block" />
 
-      {/* Right */}
       <div className="flex items-center gap-4 sm:gap-6">
-        {/* Notifications */}
         <button className="relative text-gray-600 hover:text-gray-900" onClick={goToNotifications}>
           <FiBell size={22} />
 
@@ -41,7 +43,6 @@ export default function Navbar({ role, onMenuClick }) {
           )}
         </button>
 
-        {/* User */}
         <div className="flex items-center gap-2 max-w-[160px] sm:max-w-[220px]">
           <FiUser size={30} className="text-blue-600 shrink-0" />
 

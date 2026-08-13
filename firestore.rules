@@ -1,0 +1,88 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isOwner() {
+      return isSignedIn() && userDoc().role.lower() == 'owner';
+    }
+
+    function isCollector() {
+      return isSignedIn() && userDoc().role.lower() == 'collector';
+    }
+
+    function collectorBusinessId() {
+      return get(/databases/$(database)/documents/collectors/$(request.auth.uid)).data.collectorId;
+    }
+
+    function collectorSelfUpdate() {
+      return isCollector()
+        && request.auth.uid == resource.id
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'phone', 'village', 'address', 'vehicleNumber', 'whatsappEnabled', 'notifyOnDeviceOffline']);
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isOwner());
+      allow update: if isOwner()
+        || (isSignedIn() && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'profileImage']));
+      allow create, delete: if isOwner();
+    }
+
+    match /collectors/{uid} {
+      allow read: if isSignedIn();
+      allow create, delete: if isOwner();
+      allow update: if isOwner() || collectorSelfUpdate();
+    }
+
+    match /milkCollections/{docId} {
+      allow read: if isOwner();
+      allow read: if isCollector() && resource.data.collectorId == collectorBusinessId();
+      allow create: if isOwner();
+      allow delete: if isOwner();
+      allow update: if isOwner();
+      allow update: if isCollector()
+        && resource.data.collectorId == collectorBusinessId()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity']);
+    }
+
+    match /notifications/{docId} {
+      // Owner bridge checks idempotency via get() on any notification doc.
+      allow get: if isOwner();
+      allow get: if isCollector()
+        && resource.data.recipientType == 'COLLECTOR'
+        && resource.data.recipientId == collectorBusinessId();
+      allow list: if isOwner() && resource.data.recipientType == 'OWNER';
+      allow list: if isCollector()
+        && resource.data.recipientType == 'COLLECTOR'
+        && resource.data.recipientId == collectorBusinessId();
+      allow create: if isOwner();
+      allow update: if isOwner();
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isOwner();
+    }
+
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner();
+    }
+
+    match /counters/{counterId} {
+      allow read, write: if isOwner();
+    }
+
+    match /reports/{docId} {
+      allow read, write: if isOwner();
+    }
+  }
+}

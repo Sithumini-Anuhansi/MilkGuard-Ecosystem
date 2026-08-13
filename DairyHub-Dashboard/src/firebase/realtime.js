@@ -1,4 +1,4 @@
-import { ref, onValue, off, set } from "firebase/database";
+import { ref, onValue, off, set, get, remove } from "firebase/database";
 import { realtimeDB } from "./firebaseConfig";
 
 // Logs a clear, path-specific message instead of letting a denied/failed
@@ -103,4 +103,18 @@ export const pushAlert = async ({ title, message, severity = "HIGH" }) => {
     severity,
     timestamp: Date.now(),
   });
+};
+
+/** Dedup flag for device-offline notifications (shared with Cloud Function logic). */
+export const getDeviceOfflineAlertSent = async () => {
+  const snap = await get(ref(realtimeDB, "liveData/deviceOfflineAlertSent"));
+  return snap.exists() ? snap.val() : 0;
+};
+
+export const setDeviceOfflineAlertSent = async (timestamp = Date.now()) => {
+  await set(ref(realtimeDB, "liveData/deviceOfflineAlertSent"), timestamp);
+};
+
+export const clearDeviceOfflineAlertSent = async () => {
+  await remove(ref(realtimeDB, "liveData/deviceOfflineAlertSent"));
 };

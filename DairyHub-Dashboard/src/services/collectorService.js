@@ -9,14 +9,29 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
 } from "firebase/firestore";
 
 import { db } from "../firebase/firebaseConfig";
 import { createCollectorAccount } from "../firebase/auth";
+import { normalizeRfidUID, isValidRfidUID } from "../utils/rfidUtils";
 import { getNextSequentialId } from "./counterService";
 
 const collectorsRef = collection(db, "collectors");
+
+/**
+ * Check whether an RFID UID is already assigned to another active collector.
+ */
+export const isRfidUIDTaken = async (rfidUID, excludeDocId = null) => {
+  const normalized = normalizeRfidUID(rfidUID);
+  if (!normalized) return false;
+
+  const q = query(collectorsRef, where("rfidUID", "==", normalized));
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.some((docSnap) => docSnap.id !== excludeDocId);
+};
 
 /**
  * Fetch all collectors, newest first.
@@ -52,6 +67,14 @@ export const addCollector = async ({
   rfidUID,
   vehicleNumber,
 }) => {
+  const normalizedRfid = normalizeRfidUID(rfidUID);
+  if (!isValidRfidUID(normalizedRfid)) {
+    throw new Error("Invalid RFID UID format. Use format like 77:A8:B1:05");
+  }
+  if (await isRfidUIDTaken(normalizedRfid)) {
+    throw new Error("This RFID card is already assigned to another collector.");
+  }
+
   const uid = await createCollectorAccount(email, password);
   const collectorId = await getNextSequentialId("collectors", "COL");
   const now = Timestamp.now();
@@ -75,8 +98,10 @@ export const addCollector = async ({
     email,
     address: address || "",
     village: village || "",
-    rfidUID,
+    rfidUID: normalizedRfid,
     vehicleNumber: vehicleNumber || "",
+    whatsappEnabled: true,
+    notifyOnDeviceOffline: true,
     status: "ACTIVE",
     joinedDate: now,
     uid,
@@ -91,7 +116,20 @@ export const addCollector = async ({
  * documents carry copies of those fields.
  */
 export const updateCollector = async (uid, updates) => {
-  await updateDoc(doc(db, "collectors", uid), updates);
+  const payload = { ...updates };
+
+  if (payload.rfidUID !== undefined) {
+    const normalizedRfid = normalizeRfidUID(payload.rfidUID);
+    if (!isValidRfidUID(normalizedRfid)) {
+      throw new Error("Invalid RFID UID format. Use format like 77:A8:B1:05");
+    }
+    if (await isRfidUIDTaken(normalizedRfid, uid)) {
+      throw new Error("This RFID card is already assigned to another collector.");
+    }
+    payload.rfidUID = normalizedRfid;
+  }
+
+  await updateDoc(doc(db, "collectors", uid), payload);
 
   const mirrored = {};
   if (updates.name !== undefined) mirrored.name = updates.name;
@@ -132,7 +170,21 @@ export const getCollectorById = async (uid) => {
  * Look up a collector by their RFID UID (used when logging a new reading).
  */
 export const getCollectorByRFID = async (rfidUID) => {
-  const q = query(collectorsRef, where("rfidUID", "==", rfidUID));
+  const normalized = normalizeRfidUID(rfidUID);
+  const q = query(collectorsRef, where("rfidUID", "==", normalized));
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) return null;
+
+  const docSnap = snapshot.docs[0];
+  return { id: docSnap.id, ...docSnap.data() };
+};
+
+/**
+ * Look up a collector by business id (COL001, COL005, ...).
+ */
+export const getCollectorByBusinessId = async (collectorId) => {
+  const q = query(collectorsRef, where("collectorId", "==", collectorId), limit(1));
   const snapshot = await getDocs(q);
 
   if (snapshot.empty) return null;

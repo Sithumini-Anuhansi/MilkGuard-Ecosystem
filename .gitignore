@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+whatsapp-api/node_modules/
+
+# Environment & secrets (never commit)
+.env
+.env.*
+!.env.example
+DairyHub-Dashboard/.env
+DairyHub-Dashboard/.env.local
+DairyHub-Dashboard/.env.*.local
+functions/.env
+whatsapp-api/.env
+MilkGuard-Device/secrets.h
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vercel
+.vercel/

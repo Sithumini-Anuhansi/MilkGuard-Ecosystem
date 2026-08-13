@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import { FiUser, FiPhone, FiCreditCard, FiMail, FiMapPin, FiTruck, FiEdit2, FiSave, FiX } from "react-icons/fi";
+import { FiUser, FiPhone, FiCreditCard, FiMail, FiMapPin, FiTruck, FiEdit2, FiSave, FiX, FiBell } from "react-icons/fi";
 
 import Loading from "../../components/common/Loading";
 import { useAuth } from "../../context/AuthContext";
 import { getCollectorById, updateCollector } from "../../services/collectorService";
+import { normalizePhone, isValidPhone } from "../../utils/phoneUtils";
 
 const FIELD_ROWS = [
   { key: "name", label: "Name", icon: FiUser, editable: true },
   { key: "email", label: "Email", icon: FiMail, editable: false },
-  { key: "phone", label: "Phone", icon: FiPhone, editable: true },
+  { key: "phone", label: "WhatsApp Phone", icon: FiPhone, editable: true },
   { key: "rfidUID", label: "RFID Card", icon: FiCreditCard, editable: false, mono: true },
   { key: "village", label: "Village", icon: FiMapPin, editable: true },
   { key: "address", label: "Address", icon: FiMapPin, editable: true },
@@ -56,20 +57,35 @@ export default function Profile() {
     setSaving(true);
     setError("");
 
+    const phone = normalizePhone(form.phone);
+    if (phone && !isValidPhone(phone)) {
+      setError("Enter a valid Sri Lankan mobile number (e.g. +94702691992).");
+      setSaving(false);
+      return;
+    }
+
     try {
       await updateCollector(user.uid, {
         name: form.name,
-        phone: form.phone,
+        phone,
         village: form.village,
         address: form.address,
         vehicleNumber: form.vehicleNumber,
+        whatsappEnabled: !!form.whatsappEnabled,
+        notifyOnDeviceOffline: !!form.notifyOnDeviceOffline,
       });
 
-      setCollector((prev) => ({ ...prev, ...form }));
+      const updated = {
+        ...collector,
+        ...form,
+        phone,
+      };
+      setCollector(updated);
+      setForm(updated);
       setEditing(false);
     } catch (err) {
       console.error("Failed to update profile:", err);
-      setError("Couldn't save your changes. Please try again.");
+      setError(err?.message || "Couldn't save your changes. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -112,13 +128,17 @@ export default function Profile() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Phone</label>
+                <label className="block text-sm font-medium mb-1">WhatsApp Phone</label>
                 <input
                   type="text"
                   value={form.phone || ""}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   className="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="+94702691992"
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  Used for milk test WhatsApp alerts. Include country code +94.
+                </p>
               </div>
 
               <div>
@@ -152,6 +172,38 @@ export default function Profile() {
               </div>
             </div>
 
+            <div className="border-t pt-5 space-y-3">
+              <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                <FiBell /> Notification Settings
+              </h3>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.whatsappEnabled !== false}
+                  onChange={(e) => setForm({ ...form, whatsappEnabled: e.target.checked })}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm">
+                  Receive WhatsApp for my milk tests (Fresh, Warning, Spoiled)
+                </span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.notifyOnDeviceOffline !== false}
+                  onChange={(e) =>
+                    setForm({ ...form, notifyOnDeviceOffline: e.target.checked })
+                  }
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm">
+                  Notify me when the device goes offline while I am using it
+                </span>
+              </label>
+            </div>
+
             {error && <div className="rounded-lg bg-red-100 text-red-700 p-3 text-sm">{error}</div>}
 
             <div className="flex gap-3">
@@ -173,19 +225,32 @@ export default function Profile() {
             </div>
           </form>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-5 max-w-2xl">
-            {FIELD_ROWS.map(({ key, label, icon: Icon, mono }) => (
-              <div key={key} className="flex items-center gap-4">
-                <Icon className="text-blue-600 shrink-0" size={20} />
-                <div>
-                  <p className="text-sm text-gray-500">{label}</p>
-                  <p className={`font-semibold ${mono ? "font-mono" : ""}`}>
-                    {(key === "email" ? user?.email : collector[key]) || "-"}
-                  </p>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-5 max-w-2xl">
+              {FIELD_ROWS.map(({ key, label, icon: Icon, mono }) => (
+                <div key={key} className="flex items-center gap-4">
+                  <Icon className="text-blue-600 shrink-0" size={20} />
+                  <div>
+                    <p className="text-sm text-gray-500">{label}</p>
+                    <p className={`font-semibold ${mono ? "font-mono" : ""}`}>
+                      {(key === "email" ? user?.email : collector[key]) || "-"}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            <div className="mt-6 pt-5 border-t max-w-2xl space-y-2 text-sm text-gray-600">
+              <p>
+                <span className="font-medium">WhatsApp milk alerts:</span>{" "}
+                {collector.whatsappEnabled !== false ? "Enabled" : "Disabled"}
+              </p>
+              <p>
+                <span className="font-medium">Device offline alerts:</span>{" "}
+                {collector.notifyOnDeviceOffline !== false ? "Enabled" : "Disabled"}
+              </p>
+            </div>
+          </>
         )}
       </div>
     </div>

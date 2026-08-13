@@ -3,12 +3,14 @@ import { Outlet } from "react-router";
 
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
+import OwnerNotificationBridge from "./OwnerNotificationBridge";
 
 export default function Layout({ role }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-sky-100">
+      {role === "owner" && <OwnerNotificationBridge />}
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div

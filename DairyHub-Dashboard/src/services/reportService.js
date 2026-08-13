@@ -30,33 +30,64 @@ const toRows = (records) =>
   ]);
 
 /**
- * Resolve a start/end Date range from a named period, or pass explicit dates through.
+ * Resolve a start/end Date range from a named period and a reference date.
  */
-export const resolveRange = (period) => {
-  const end = new Date();
-  const start = new Date();
+export const resolveRange = (period, referenceDate = new Date()) => {
+  const ref = new Date(referenceDate);
 
   switch (period) {
-    case "weekly":
-      start.setDate(end.getDate() - 7);
-      break;
-    case "monthly":
-      start.setMonth(end.getMonth() - 1);
-      break;
-    case "daily":
-    default:
+    case "weekly": {
+      const start = new Date(ref);
+      const day = start.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      start.setDate(start.getDate() + diff);
       start.setHours(0, 0, 0, 0);
-      break;
+
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    case "monthly": {
+      const start = new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0);
+      const end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { start, end };
+    }
+    case "daily":
+    default: {
+      const start = new Date(ref);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(ref);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+  }
+};
+
+export const formatReportRange = (period, referenceDate = new Date()) => {
+  const { start, end } = resolveRange(period, referenceDate);
+
+  if (period === "daily") {
+    return start.toLocaleDateString();
   }
 
-  return { start, end };
+  if (period === "weekly") {
+    return `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`;
+  }
+
+  return start.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 };
 
 /**
  * Fetch the records for a report, optionally filtered to one collector.
+ * collectorId is the business id (COL001), not the Firestore document uid.
  */
-export const getReportData = async (period = "daily", collectorId = null) => {
-  const { start, end } = resolveRange(period);
+export const getReportData = async (
+  period = "daily",
+  collectorId = null,
+  referenceDate = new Date()
+) => {
+  const { start, end } = resolveRange(period, referenceDate);
   const records = await getCollectionsByDateRange(start, end);
 
   if (!collectorId) return records;

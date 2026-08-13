@@ -1,0 +1,26 @@
+{
+  "rules": {
+    "liveData": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "alerts": {
+        ".write": "auth != null"
+      },
+      "deviceOfflineAlertSent": {
+        ".write": "auth != null"
+      }
+    },
+    "milkTests": {
+      "$testId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "roles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": false
+      }
+    }
+  }
+}

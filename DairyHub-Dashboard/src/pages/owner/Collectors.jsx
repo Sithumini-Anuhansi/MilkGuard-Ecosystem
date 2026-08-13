@@ -11,6 +11,7 @@ import {
   deleteCollector,
 } from "../../services/collectorService";
 import { getAllCollections } from "../../services/milkCollectionService";
+import { normalizeRfidUID } from "../../utils/rfidUtils";
 
 const emptyForm = {
   name: "",
@@ -111,7 +112,7 @@ export default function Collectors() {
       setError(
         err?.code === "auth/email-already-in-use"
           ? "That email already has a login account."
-          : "Something went wrong. Please try again."
+          : err?.message || "Something went wrong. Please try again."
       );
     } finally {
       setSaving(false);
@@ -377,10 +378,15 @@ export default function Collectors() {
                   <input
                     type="text"
                     value={form.rfidUID}
-                    onChange={(e) => setForm({ ...form, rfidUID: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, rfidUID: normalizeRfidUID(e.target.value) })
+                    }
                     className="w-full border rounded-lg p-3 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="8A3F91BC"
+                    placeholder="77:A8:B1:05"
                   />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Format: XX:XX:XX:XX — scan card on device Serial Monitor to read UID
+                  </p>
                 </div>
 
                 <div>

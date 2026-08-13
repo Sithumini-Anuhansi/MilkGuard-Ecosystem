@@ -1,82 +1,72 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import DashboardCards from "../../components/dashboard/DashboardCards";
 import LatestReading from "../../components/dashboard/LatestReading";
-import DeviceStatus from "../../components/dashboard/DeviceStatus";
-import LiveAlertBanner from "../../components/dashboard/LiveAlertBanner";
 import DashboardCharts from "../../components/dashboard/DashboardCharts";
 import Loading from "../../components/common/Loading";
+import LiveDeviceState from "../../components/dashboard/LiveDeviceState";
 
 import useRealtimeMilkData from "../../hooks/useRealtimeMilkData";
-import useAutoLogCollection from "../../hooks/useAutoLogCollection";
+import useLiveDeviceState from "../../hooks/useLiveDeviceState";
 
-import { getTodaySummary } from "../../services/dashboardService";
-import { getAllCollections } from "../../services/milkCollectionService";
+import { computeTodaySummary } from "../../services/dashboardService";
+import { subscribeAllCollections } from "../../services/milkCollectionService";
 import { getSettings } from "../../services/settingsService";
 
 export default function Dashboard() {
   const milkData = useRealtimeMilkData();
+  const { latestStatus, currentCollector } = useLiveDeviceState();
 
-  // Mirrors every new ESP32 reading into Firestore history and raises alerts.
-  useAutoLogCollection();
-
-  const [summary, setSummary] = useState(null);
   const [records, setRecords] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
+  const summary = useMemo(() => computeTodaySummary(records), [records]);
 
-    async function load() {
-      try {
-        const [summaryData, history, thresholds] = await Promise.all([
-          getTodaySummary(),
-          getAllCollections(100),
-          getSettings(),
-        ]);
+  /** RTDB live test + Firestore quantity (manual edits live in milkCollections). */
+  const latestMilkData = useMemo(() => {
+    if (!milkData) return null;
 
-        if (!cancelled) {
-          setSummary(summaryData);
-          setRecords(history);
-          setSettings(thresholds);
-        }
-      } catch (err) {
-        console.error("Failed to load dashboard data:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
+    const saved = records.find(
+      (record) => record.testId === milkData.testId || record.id === milkData.testId
+    );
 
-    load();
-    return () => {
-      cancelled = true;
+    if (!saved) return milkData;
+
+    return {
+      ...milkData,
+      quantity: saved.quantity ?? milkData.quantity ?? 0,
     };
-  }, [milkData]); // refresh summary/history whenever a new live reading comes in
+  }, [milkData, records]);
+
+  useEffect(() => {
+    getSettings()
+      .then(setSettings)
+      .catch((err) => console.error("Failed to load settings:", err));
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeAllCollections((history) => {
+      setRecords(history);
+      setLoading(false);
+    }, 100);
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <div className="space-y-8">
-      {/* Heading */}
       <div>
         <h1 className="text-3xl font-bold text-gray-800">MilkGuard Dashboard</h1>
         <p className="text-gray-500 mt-2">Real-time milk quality monitoring</p>
       </div>
 
-      {/* Instant ESP32-pushed alert, if any */}
-      <LiveAlertBanner />
+      <LiveDeviceState latestStatus={latestStatus} currentCollector={currentCollector} />
 
-      {/* Summary Cards */}
       <DashboardCards summary={summary} />
 
-      {/* Status + Device */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DeviceStatus />
-      </div>
+      <LatestReading milkData={latestMilkData} settings={settings} />
 
-      {/* Latest Reading */}
-      <LatestReading milkData={milkData} />
-
-      {/* Analytics */}
       {loading ? <Loading label="Loading analytics..." /> : <DashboardCharts records={records} />}
     </div>
   );
