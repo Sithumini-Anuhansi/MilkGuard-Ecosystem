@@ -10,6 +10,11 @@ const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v21.0";
 const TEMPLATE_CATALOG = {
   hello_world: { language: "en_US", bodyParams: 0 },
   milkguard_milk_alert: { language: "en", bodyParams: 5 },
+  // The template actually created/approved in Meta Business Manager —
+  // order is [testId, collectorName, status, pH, gas], matching the body:
+  // "Your MilkGuard alert for Ref: {{1}} has been triggered: Collector {{2}}
+  //  Status: {{3}} pH {{4}} Gas {{5}} ppm"
+  milkguard_alerts: { language: "en", bodyParams: 5 },
 };
 
 function getTemplateConfig(templateName) {

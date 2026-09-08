@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 const { persistCollection } = require("./persistCollection");
-const { sendWhatsApp, buildMilkMessage } = require("./sendWhatsApp");
+const { sendWhatsApp, buildMilkMessage, buildMilkTemplateParams } = require("./sendWhatsApp");
 
 const db = admin.firestore();
 
@@ -89,6 +89,7 @@ async function processMilkTest(test) {
 
   const settings = await getSettings();
   const message = buildMilkMessage(test);
+  const templateParams = buildMilkTemplateParams(test);
   const type = STATUS_TYPE_MAP[test.status] || "INFO";
   const priority = PRIORITY_MAP[test.status] || "MEDIUM";
 
@@ -111,7 +112,7 @@ async function processMilkTest(test) {
 
   let ownerWhatsappSent = false;
   if (shouldWhatsAppOwner(test.status, settings) && settings.ownerPhone) {
-    ownerWhatsappSent = await sendWhatsApp(settings.ownerPhone, message);
+    ownerWhatsappSent = await sendWhatsApp(settings.ownerPhone, message, templateParams);
   }
 
   await createNotification({
@@ -136,7 +137,7 @@ async function processMilkTest(test) {
     shouldWhatsAppCollector(test.status, collector) &&
     collector?.phone
   ) {
-    collectorWhatsappSent = await sendWhatsApp(collector.phone, message);
+    collectorWhatsappSent = await sendWhatsApp(collector.phone, message, templateParams);
   }
 
   if (test.collectorId) {

@@ -43,23 +43,37 @@ Save these values:
 
 1. Open [Meta Business Suite](https://business.facebook.com/) → **WhatsApp Manager** → **Message templates**
 2. **Create template**
-   - **Name:** `milkguard_milk_alert` (lowercase, underscores only)
+   - **Name:** `milkguard_alerts` (lowercase, underscores only — must match `WHATSAPP_TEMPLATE_NAME` exactly in both `.env` files)
    - **Category:** Utility
    - **Language:** English
-   - **Body:**
+   - **Header (static text, no variable):** `MilkGuard Alert`
+   - **Body (verbatim — variable numbers below are Meta's actual assignment, not reading order):**
 
 ```
-MilkGuard — Collector: {{1}}. Status: {{2}}. pH: {{3}}, Gas: {{4}} ppm. Test ID: {{5}}.
+Your MilkGuard alert for Ref: {{5}} has been triggered:
+{{1}}
+Status: {{2}}
+{{3}}
+{{4}}
 ```
+
+   - **Footer (static text, no variables allowed here):** `Visit the website for more details.`
+
+**Important:** only `{{2}}` (`Status:`) and `{{5}}` (`Ref:`) have a literal label already in the template text. `{{1}}`, `{{3}}`, and `{{4}}` are bare lines with no label — the code has to send the full label *inside* the value:
+
+| Param sent (array index → `{{n}}`) | Value | Renders as |
+|---|---|---|
+| `[0]` → `{{1}}` | `"Collector Pabasara"` | `Collector Pabasara` |
+| `[1]` → `{{2}}` | `"Warning"` | `Status: Warning` |
+| `[2]` → `{{3}}` | `"pH 6.85"` | `pH 6.85` |
+| `[3]` → `{{4}}` | `"Gas 520 ppm"` | `Gas 520 ppm` |
+| `[4]` → `{{5}}` | `"MG-0019"` | `Ref: MG-0019` |
+
+This is what `buildMilkTemplateParams()` in both `DairyHub-Dashboard/src/services/notificationBridge.js` (the active sender) and `functions/src/sendWhatsApp.js` (the dormant Cloud Functions fallback) build. If you ever edit the template's body wording in Meta, update both functions to match — Meta fills `{{1}}`..`{{5}}` purely positionally from the array you send; it has no idea what a "correct" value looks like.
 
 3. Submit for approval (often minutes to a few hours for Utility templates)
 
-Optional second template for device offline:
-
-- **Name:** `milkguard_device_alert`
-- **Body:** `MilkGuard device {{1}} is {{2}}. Last collector: {{3}}.`
-
-For MilkGuard code, device alerts reuse `milkguard_milk_alert` with params `[deviceId, "Offline", collectorName, "-", "DEVICE"]`.
+Device-offline alerts reuse this same template via `buildDeviceTemplateParams()`: `["Device <id>", "Offline", "Last collector <name>" (or "No recent collector"), "-", "<deviceId>"]`.
 
 ---
 

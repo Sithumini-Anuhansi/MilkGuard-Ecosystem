@@ -8,18 +8,44 @@ import { getSettings } from "./settingsService";
 import { pushAlert } from "../firebase/realtime";
 import { sendWhatsAppMessage } from "./whatsappService";
 
+// Must match the actual approved template body exactly:
+//   "Your MilkGuard alert for Ref: {{5}} has been triggered:
+//    {{1}}
+//    Status: {{2}}
+//    {{3}}
+//    {{4}}
+//    Visit the website for more details."
+// Only {{2}} (Status:) and {{5}} (Ref:) have a literal label in the template
+// itself — {{1}}, {{3}}, {{4}} are bare lines, so the label has to be baked
+// into the value sent from here.
 function buildMilkTemplateParams(test) {
+  const name = test.collectorName || "Unknown";
+  const status = test.status || "Unknown";
+  const ph = Number(test.pH).toFixed(2);
+  const gas = Math.round(Number(test.gas));
+  const testId = test.testId || "";
+
   return [
-    test.collectorName || "Unknown",
-    test.status || "Unknown",
-    Number(test.pH).toFixed(2),
-    String(Math.round(Number(test.gas))),
-    test.testId || "",
+    `Collector ${name}`, // {{1}}
+    status,              // {{2}} — "Status: {{2}}"
+    `pH ${ph}`,          // {{3}}
+    `Gas ${gas} ppm`,    // {{4}}
+    testId,              // {{5}} — "Ref: {{5}}"
   ];
 }
 
+// Device-offline alerts reuse the same template, repurposed:
+// {{1}}="Device <id>", {{2}}="Offline", {{3}}=last collector (or none),
+// {{4}}="-", {{5}}=deviceId (as the "Ref").
 function buildDeviceTemplateParams(deviceId, event, collectorName) {
-  return [deviceId || "ESP32", event, collectorName || "N/A", "-", "DEVICE"];
+  const id = deviceId || "ESP32";
+  return [
+    `Device ${id}`,
+    event || "Offline",
+    collectorName ? `Last collector ${collectorName}` : "No recent collector",
+    "-",
+    id,
+  ];
 }
 
 const STATUS_TYPE_MAP = {

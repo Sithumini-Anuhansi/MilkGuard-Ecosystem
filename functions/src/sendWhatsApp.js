@@ -1,6 +1,11 @@
 /**
  * Send WhatsApp messages via Meta Cloud API or Twilio Sandbox.
  * Credentials are read from Firebase environment config / Secret Manager at deploy time.
+ *
+ * NOTE: this is currently a dormant fallback path — the active sender is the
+ * client-side bridge (DairyHub-Dashboard/src/services/notificationBridge.js
+ * + whatsapp-api/). Kept in sync with the same template/param order so this
+ * doesn't silently break if Cloud Functions become the production path later.
  */
 
 function normalizePhone(phone) {
@@ -8,7 +13,24 @@ function normalizePhone(phone) {
   return phone.replace(/\D/g, "");
 }
 
-async function sendViaMeta(to, message) {
+// Same catalog as whatsapp-api/lib/sendWhatsApp.js — keep both in sync.
+const TEMPLATE_CATALOG = {
+  hello_world: { language: "en_US", bodyParams: 0 },
+  milkguard_milk_alert: { language: "en", bodyParams: 5 },
+  milkguard_alerts: { language: "en", bodyParams: 5 },
+};
+
+function getTemplateConfig(templateName) {
+  if (TEMPLATE_CATALOG[templateName]) return TEMPLATE_CATALOG[templateName];
+
+  const bodyParams = Number(process.env.WHATSAPP_TEMPLATE_BODY_PARAMS);
+  return {
+    language: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US",
+    bodyParams: Number.isFinite(bodyParams) ? bodyParams : 0,
+  };
+}
+
+async function sendViaMeta(to, message, templateParams = []) {
   const token = process.env.WHATSAPP_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -17,20 +39,44 @@ async function sendViaMeta(to, message) {
     return false;
   }
 
+  const templateName = process.env.WHATSAPP_TEMPLATE_NAME || "";
+  const { language, bodyParams } = getTemplateConfig(templateName);
+
+  const payload = {
+    messaging_product: "whatsapp",
+    to: normalizePhone(to),
+  };
+
+  if (templateName) {
+    payload.type = "template";
+    payload.template = { name: templateName, language: { code: language } };
+
+    if (bodyParams > 0) {
+      const params = templateParams.slice(0, bodyParams).map((v) => String(v));
+      while (params.length < bodyParams) params.push("-");
+
+      payload.template.components = [
+        {
+          type: "body",
+          parameters: params.map((text) => ({ type: "text", text })),
+        },
+      ];
+    }
+  } else {
+    // Only works inside a 24h customer-initiated window — no template configured.
+    payload.type = "text";
+    payload.text = { body: message };
+  }
+
   const response = await fetch(
-    `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+    `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: normalizePhone(to),
-        type: "text",
-        text: { body: message },
-      }),
+      body: JSON.stringify(payload),
     }
   );
 
@@ -81,7 +127,7 @@ async function sendViaTwilio(to, message) {
   return true;
 }
 
-async function sendWhatsApp(to, message) {
+async function sendWhatsApp(to, message, templateParams = []) {
   if (!to) return false;
 
   const provider = (process.env.WHATSAPP_PROVIDER || "meta").toLowerCase();
@@ -90,7 +136,33 @@ async function sendWhatsApp(to, message) {
     return sendViaTwilio(to, message);
   }
 
-  return sendViaMeta(to, message);
+  return sendViaMeta(to, message, templateParams);
+}
+
+// Must match the actual approved template body exactly:
+//   "Your MilkGuard alert for Ref: {{5}} has been triggered:
+//    {{1}}
+//    Status: {{2}}
+//    {{3}}
+//    {{4}}
+//    Visit the website for more details."
+// Only {{2}} (Status:) and {{5}} (Ref:) have a literal label in the template
+// itself — {{1}}, {{3}}, {{4}} are bare lines, so the label has to be baked
+// into the value sent from here.
+function buildMilkTemplateParams(test) {
+  const name = test.collectorName || "Unknown";
+  const status = test.status || "Unknown";
+  const ph = Number(test.pH).toFixed(2);
+  const gas = Math.round(Number(test.gas));
+  const testId = test.testId || "";
+
+  return [
+    `Collector ${name}`, // {{1}}
+    status,              // {{2}} — "Status: {{2}}"
+    `pH ${ph}`,          // {{3}}
+    `Gas ${gas} ppm`,    // {{4}}
+    testId,              // {{5}} — "Ref: {{5}}"
+  ];
 }
 
 function buildMilkMessage(test) {
@@ -112,4 +184,4 @@ function buildMilkMessage(test) {
   );
 }
 
-module.exports = { sendWhatsApp, buildMilkMessage };
+module.exports = { sendWhatsApp, buildMilkMessage, buildMilkTemplateParams };

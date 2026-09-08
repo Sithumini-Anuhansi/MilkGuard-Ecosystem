@@ -678,10 +678,8 @@ void loop()
         status = "Fresh";
     else if (avgGas >= 520 && avgGas <= 780)
         status = "Warning";
-    else if (avgGas > 780)
-        status = "Spoiled";
     else
-        status = "Unknown";
+        status = "Spoiled";
 
     Serial.print("Status: ");
     Serial.println(status);
