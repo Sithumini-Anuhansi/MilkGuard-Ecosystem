@@ -3,6 +3,7 @@
 Smart dairy milk-quality monitoring for small and medium dairy hubs. Collectors scan an RFID card, the ESP32 runs a sensor test, and results flow to owner and collector dashboards in real time—with permanent history, alerts, and optional WhatsApp notifications.
 
 <img width="100%" alt="MilkGuard-Ecosystem Banner" src="/images/MilkGuard-Ecosystem.png">
+
 ---
 
 ## What it does
